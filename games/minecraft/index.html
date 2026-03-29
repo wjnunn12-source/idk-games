@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Infinite Minecraft</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+
+<script>
+// ---------------- SETUP ----------------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+
+const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// ---------------- LIGHT ----------------
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(20, 50, 20);
+scene.add(light);
+
+// ---------------- PLAYER ----------------
+camera.position.set(0, 20, 0);
+
+let keys = {};
+document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+// ---------------- MOUSE LOOK ----------------
+let yaw = 0, pitch = 0;
+
+document.body.onclick = () => document.body.requestPointerLock();
+
+document.addEventListener("mousemove", e => {
+    if (document.pointerLockElement === document.body) {
+        yaw -= e.movementX * 0.002;
+        pitch -= e.movementY * 0.002;
+        pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+    }
+});
+
+// ---------------- TERRAIN ----------------
+const chunkSize = 16;
+const renderDistance = 3;
+
+const blocks = new Map();
+const geometry = new THREE.BoxGeometry(1,1,1);
+
+// simple pseudo noise
+function noise(x, z) {
+    return Math.sin(x * 0.2) * Math.cos(z * 0.2);
+}
+
+// generate chunk
+function generateChunk(cx, cz) {
+    const key = cx + "," + cz;
+    if (blocks.has(key)) return;
+
+    const chunk = [];
+
+    for (let x = 0; x < chunkSize; x++) {
+        for (let z = 0; z < chunkSize; z++) {
+
+            const worldX = cx * chunkSize + x;
+            const worldZ = cz * chunkSize + z;
+
+            const height = Math.floor(noise(worldX, worldZ) * 5 + 10);
+
+            for (let y = 0; y < height; y++) {
+                const material = new THREE.MeshLambertMaterial({
+                    color: y === height-1 ? 0x55aa55 : 0x8b5a2b
+                });
+
+                const cube = new THREE.Mesh(geometry, material);
+                cube.position.set(worldX, y, worldZ);
+                scene.add(cube);
+                chunk.push(cube);
+            }
+        }
+    }
+
+    blocks.set(key, chunk);
+}
+
+// unload far chunks
+function unloadChunks(px, pz) {
+    for (let key of blocks.keys()) {
+        const [cx, cz] = key.split(",").map(Number);
+
+        if (Math.abs(cx - px) > renderDistance || Math.abs(cz - pz) > renderDistance) {
+            for (let cube of blocks.get(key)) {
+                scene.remove(cube);
+            }
+            blocks.delete(key);
+        }
+    }
+}
+
+// load chunks around player
+function updateChunks() {
+    const px = Math.floor(camera.position.x / chunkSize);
+    const pz = Math.floor(camera.position.z / chunkSize);
+
+    for (let x = -renderDistance; x <= renderDistance; x++) {
+        for (let z = -renderDistance; z <= renderDistance; z++) {
+            generateChunk(px + x, pz + z);
+        }
+    }
+
+    unloadChunks(px, pz);
+}
+
+// ---------------- MOVEMENT ----------------
+function updatePlayer() {
+    const speed = 0.2;
+
+    const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+    const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+
+    if (keys["w"]) camera.position.add(forward.clone().multiplyScalar(-speed));
+    if (keys["s"]) camera.position.add(forward.clone().multiplyScalar(speed));
+    if (keys["a"]) camera.position.add(right.clone().multiplyScalar(-speed));
+    if (keys["d"]) camera.position.add(right.clone().multiplyScalar(speed));
+
+    camera.rotation.order = "YXZ";
+    camera.rotation.y = yaw;
+    camera.rotation.x = pitch;
+}
+
+// ---------------- LOOP ----------------
+function animate() {
+    requestAnimationFrame(animate);
+
+    updatePlayer();
+    updateChunks();
+
+    renderer.render(scene, camera);
+}
+
+animate();
+</script>
+
+</body>
+</html>

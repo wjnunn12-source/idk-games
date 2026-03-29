@@ -1,0 +1,127 @@
+
+
+
+
+
+.content {
+    display: flex;
+    
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    
+}
+
+
+
+
+
+
+
+.content > h2{font-size: 48px;}
+.content > p {font-size: 32px;}
+
+
+.startButton {
+    position: absolute;
+    left: 275px;
+    top:  220px;
+
+    width: 100px;
+    height: 50px;
+
+    font-size: 40px;
+    text-align: center;
+    color: white;
+
+    border-color: #5e0fc5;
+    border-radius: 5px;
+    border-width: 0px;
+    box-shadow: none;
+
+    background-color: #5e0fc5;
+    
+}
+
+.startButton:active{
+    background-color: #3e0b81;
+}
+
+
+.gameHolder{
+    position: relative;
+}
+
+.gameBg{
+    position: absolute;
+    width: 640px;
+    height: 360px;
+    
+    left: 5px;
+    top: 69px;
+
+    background-repeat: no-repeat,no-repeat,no-repeat;
+    background-position: top left, top left;
+}
+
+
+#game-container {
+    display: grid;
+    margin: auto;
+
+    
+    /*grid-template-columns: auto auto auto auto;*/
+    grid-gap: 50px;
+
+    position: relative;
+}
+
+
+.fullScreen {
+
+    position: absolute;
+
+    width: 50px;
+    height: 50px;
+
+    right: 10px;
+    bottom: 15px;
+
+    font-size: 40px;
+    text-align: center;
+    color: white;
+
+    border-color: #5e0fc5;
+    border-radius: 5px;
+    border-width: 0px;
+    box-shadow: none;
+    opacity: 0.8;
+
+    background: url('Images/Fullscreen.png') no-repeat center center / cover #5e0fc5;
+
+}
+
+iframe{
+    border-style: solid;
+    border-color: #29a9ff;
+    border-width: 5px;
+    border-radius: 5px;
+}
+
+
+
+
+
+
+
+
+
+body{
+    font-family: mainFont, Arial, Helvetica, sans-serif;
+    background-color:rgb(27, 27, 27);
+    
+    color: white;
+
+    margin: 0px;
+    
+}

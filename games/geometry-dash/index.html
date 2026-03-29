@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stereo Madness Clone</title>
+    <style>
+        body { margin: 0; background: black; overflow: hidden; }
+        canvas { display: block; margin: auto; background: #0a0a1a; }
+    </style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+<audio id="music" src="stereo.mp3"></audio>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const music = document.getElementById("music");
+
+canvas.width = 900;
+canvas.height = 400;
+
+// ---------------- PLAYER ----------------
+let player = {
+    x: 150,
+    y: 300,
+    size: 40,
+    dy: 0,
+    gravity: 0.7,
+    jump: -13,
+    grounded: false,
+    rot: 0
+};
+
+// ---------------- LEVEL DATA ----------------
+// timing-based obstacles (closer to real level feel)
+let level = [
+    {t: 1.0, type:"spike"},
+    {t: 1.5, type:"spike"},
+    {t: 2.5, type:"block"},
+    {t: 3.0, type:"spike"},
+    {t: 4.0, type:"block"},
+    {t: 5.0, type:"spike"},
+    {t: 6.0, type:"spike"},
+    {t: 7.0, type:"block"},
+    {t: 8.0, type:"spike"},
+    {t: 9.5, type:"block"},
+    {t: 11.0, type:"spike"},
+    {t: 12.0, type:"spike"},
+];
+
+let obstacles = [];
+
+// spawn based on music time
+function spawnFromMusic() {
+    let time = music.currentTime;
+
+    for (let obj of level) {
+        if (!obj.spawned && time >= obj.t) {
+            obj.spawned = true;
+
+            obstacles.push({
+                x: canvas.width,
+                y: obj.type === "spike" ? 320 : 300,
+                size: 40,
+                type: obj.type
+            });
+        }
+    }
+}
+
+// ---------------- INPUT ----------------
+document.addEventListener("keydown", e => {
+    if (e.code === "Space" && player.grounded) {
+        player.dy = player.jump;
+        player.grounded = false;
+    }
+
+    // start music on first key
+    if (music.paused) music.play();
+});
+
+canvas.addEventListener("click", () => {
+    if (player.grounded) {
+        player.dy = player.jump;
+        player.grounded = false;
+    }
+
+    if (music.paused) music.play();
+});
+
+// ---------------- UPDATE ----------------
+function update() {
+    spawnFromMusic();
+
+    player.dy += player.gravity;
+    player.y += player.dy;
+
+    if (!player.grounded) player.rot += 0.15;
+
+    if (player.y + player.size >= 360) {
+        player.y = 360 - player.size;
+        player.dy = 0;
+        player.grounded = true;
+        player.rot = 0;
+    }
+
+    for (let o of obstacles) {
+        o.x -= 6;
+    }
+
+    // collision
+    for (let o of obstacles) {
+        if (
+            player.x < o.x + o.size &&
+            player.x + player.size > o.x &&
+            player.y < o.y + o.size &&
+            player.y + player.size > o.y
+        ) {
+            reset();
+        }
+    }
+}
+
+// ---------------- DRAW ----------------
+function draw() {
+    ctx.fillStyle = "#0a0a1a";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // ground
+    ctx.fillStyle = "#1f4068";
+    ctx.fillRect(0, 360, canvas.width, 40);
+
+    // player
+    ctx.save();
+    ctx.translate(player.x + 20, player.y + 20);
+    ctx.rotate(player.rot);
+    ctx.fillStyle = "#00fff5";
+    ctx.fillRect(-20, -20, 40, 40);
+    ctx.restore();
+
+    // obstacles
+    for (let o of obstacles) {
+        if (o.type === "spike") {
+            ctx.fillStyle = "#ff2e63";
+            ctx.beginPath();
+            ctx.moveTo(o.x, o.y + 40);
+            ctx.lineTo(o.x + 20, o.y);
+            ctx.lineTo(o.x + 40, o.y + 40);
+            ctx.fill();
+        } else {
+            ctx.fillStyle = "#e94560";
+            ctx.fillRect(o.x, o.y, 40, 40);
+        }
+    }
+}
+
+// ---------------- RESET ----------------
+function reset() {
+    player.y = 300;
+    player.dy = 0;
+    obstacles = [];
+    music.currentTime = 0;
+
+    for (let obj of level) obj.spawned = false;
+}
+
+// ---------------- LOOP ----------------
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
+</body>
+</html>
