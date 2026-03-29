@@ -1,18 +1,27 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Infinite Minecraft</title>
+    <title>Mini Minecraft FULL</title>
     <style>
         body { margin: 0; overflow: hidden; }
         canvas { display: block; }
+        #crosshair {
+            position: fixed;
+            top: 50%; left: 50%;
+            width: 8px; height: 8px;
+            margin-left: -4px; margin-top: -4px;
+            background: white;
+        }
     </style>
 </head>
 <body>
 
+<div id="crosshair"></div>
+
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
 
 <script>
-// ---------------- SETUP ----------------
+// ---------- SETUP ----------
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 
@@ -21,19 +30,26 @@ const renderer = new THREE.WebGLRenderer();
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// ---------------- LIGHT ----------------
+// ---------- LIGHT ----------
 const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(20, 50, 20);
 scene.add(light);
 
-// ---------------- PLAYER ----------------
+// ---------- PLAYER ----------
 camera.position.set(0, 20, 0);
 
 let keys = {};
+let velocityY = 0;
+let onGround = false;
+
+const gravity = 0.04;
+const jumpPower = 0.9;
+
+// ---------- INPUT ----------
 document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
 document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
 
-// ---------------- MOUSE LOOK ----------------
+// ---------- MOUSE LOOK ----------
 let yaw = 0, pitch = 0;
 
 document.body.onclick = () => document.body.requestPointerLock();
@@ -46,64 +62,78 @@ document.addEventListener("mousemove", e => {
     }
 });
 
-// ---------------- TERRAIN ----------------
+// ---------- TERRAIN ----------
 const chunkSize = 16;
 const renderDistance = 3;
 
-const blocks = new Map();
+const chunks = new Map();
+const blocks = [];
+
 const geometry = new THREE.BoxGeometry(1,1,1);
 
-// simple pseudo noise
 function noise(x, z) {
     return Math.sin(x * 0.2) * Math.cos(z * 0.2);
+}
+
+function getHeight(x, z) {
+    return Math.floor(noise(x, z) * 5 + 10);
 }
 
 // generate chunk
 function generateChunk(cx, cz) {
     const key = cx + "," + cz;
-    if (blocks.has(key)) return;
+    if (chunks.has(key)) return;
 
     const chunk = [];
 
     for (let x = 0; x < chunkSize; x++) {
         for (let z = 0; z < chunkSize; z++) {
 
-            const worldX = cx * chunkSize + x;
-            const worldZ = cz * chunkSize + z;
+            const wx = cx * chunkSize + x;
+            const wz = cz * chunkSize + z;
 
-            const height = Math.floor(noise(worldX, worldZ) * 5 + 10);
+            const h = getHeight(wx, wz);
 
-            for (let y = 0; y < height; y++) {
-                const material = new THREE.MeshLambertMaterial({
-                    color: y === height-1 ? 0x55aa55 : 0x8b5a2b
-                });
+            for (let y = 0; y < h; y++) {
 
-                const cube = new THREE.Mesh(geometry, material);
-                cube.position.set(worldX, y, worldZ);
+                const color =
+                    y === h-1 ? 0x55aa55 :
+                    y > h-4 ? 0x8b5a2b :
+                    0x555555;
+
+                const cube = new THREE.Mesh(
+                    geometry,
+                    new THREE.MeshLambertMaterial({color})
+                );
+
+                cube.position.set(wx, y, wz);
+
                 scene.add(cube);
                 chunk.push(cube);
+                blocks.push(cube);
             }
         }
     }
 
-    blocks.set(key, chunk);
+    chunks.set(key, chunk);
 }
 
-// unload far chunks
+// unload chunks
 function unloadChunks(px, pz) {
-    for (let key of blocks.keys()) {
+    for (let key of chunks.keys()) {
         const [cx, cz] = key.split(",").map(Number);
 
         if (Math.abs(cx - px) > renderDistance || Math.abs(cz - pz) > renderDistance) {
-            for (let cube of blocks.get(key)) {
+            for (let cube of chunks.get(key)) {
                 scene.remove(cube);
+                blocks.splice(blocks.indexOf(cube), 1);
             }
-            blocks.delete(key);
+            chunks.delete(key);
         }
     }
 }
 
-// load chunks around player
+// update chunks
 function updateChunks() {
     const px = Math.floor(camera.position.x / chunkSize);
     const pz = Math.floor(camera.position.z / chunkSize);
@@ -117,9 +147,9 @@ function updateChunks() {
     unloadChunks(px, pz);
 }
 
-// ---------------- MOVEMENT ----------------
+// ---------- MOVEMENT ----------
 function updatePlayer() {
-    const speed = 0.2;
+    const speed = 0.15;
 
     const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
     const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
@@ -129,12 +159,70 @@ function updatePlayer() {
     if (keys["a"]) camera.position.add(right.clone().multiplyScalar(-speed));
     if (keys["d"]) camera.position.add(right.clone().multiplyScalar(speed));
 
+    // gravity
+    velocityY -= gravity;
+    camera.position.y += velocityY;
+
+    const ground = getHeight(
+        Math.floor(camera.position.x),
+        Math.floor(camera.position.z)
+    ) + 2;
+
+    if (camera.position.y <= ground) {
+        camera.position.y = ground;
+        velocityY = 0;
+        onGround = true;
+    } else {
+        onGround = false;
+    }
+
+    if (keys[" "] && onGround) {
+        velocityY = jumpPower;
+    }
+
     camera.rotation.order = "YXZ";
     camera.rotation.y = yaw;
     camera.rotation.x = pitch;
 }
 
-// ---------------- LOOP ----------------
+// ---------- BREAK / PLACE ----------
+const raycaster = new THREE.Raycaster();
+
+function getDirection() {
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    return dir;
+}
+
+document.addEventListener("mousedown", e => {
+    raycaster.set(camera.position, getDirection());
+    const hits = raycaster.intersectObjects(blocks);
+
+    if (hits.length > 0) {
+        const hit = hits[0].object;
+
+        if (e.button === 0) {
+            scene.remove(hit);
+            blocks.splice(blocks.indexOf(hit), 1);
+        }
+
+        if (e.button === 2) {
+            const normal = hits[0].face.normal;
+            const newBlock = new THREE.Mesh(
+                geometry,
+                new THREE.MeshLambertMaterial({color: 0xffffff})
+            );
+
+            newBlock.position.copy(hit.position).add(normal);
+            scene.add(newBlock);
+            blocks.push(newBlock);
+        }
+    }
+});
+
+document.addEventListener("contextmenu", e => e.preventDefault());
+
+// ---------- LOOP ----------
 function animate() {
     requestAnimationFrame(animate);
 
