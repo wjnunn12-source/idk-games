@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tiny Fishing Improved</title>
+    <style>
+        body {
+            margin: 0;
+            background: #87CEEB;
+            font-family: Arial;
+            text-align: center;
+        }
+        canvas {
+            display: block;
+            margin: auto;
+            background: linear-gradient(#87CEEB, #001f3f);
+        }
+        #ui {
+            background: #222;
+            color: white;
+            padding: 10px;
+        }
+        button {
+            margin: 5px;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    Money: $<span id="money">0</span>
+    <br>
+    <button onclick="upgradeDepth()">Upgrade Depth ($100)</button>
+    <button onclick="upgradeCapacity()">Upgrade Capacity ($100)</button>
+</div>
+
+<canvas id="game" width="400" height="600"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let money = 0;
+let depthLimit = 800; // MUCH DEEPER
+let capacity = 3;
+
+let keys = {};
+
+// controls
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+let hook = {
+    x: 200,
+    y: 0,
+    speed: 3,
+    state: "idle",
+    caught: []
+};
+
+let fish = [];
+
+function spawnFish() {
+    fish = [];
+    for (let i = 0; i < 50; i++) {
+        fish.push({
+            x: Math.random() * 380 + 10,
+            y: Math.random() * depthLimit + 50,
+            size: Math.random() * 8 + 8,
+            value: Math.floor(Math.random() * 20 + 5),
+            caught: false,
+            dir: Math.random() < 0.5 ? -1 : 1
+        });
+    }
+}
+
+spawnFish();
+
+canvas.addEventListener("click", () => {
+    if (hook.state === "idle") {
+        hook.state = "down";
+        hook.caught = [];
+    }
+});
+
+function update() {
+
+    // SIDE MOVEMENT
+    if (keys["ArrowLeft"]) hook.x -= 4;
+    if (keys["ArrowRight"]) hook.x += 4;
+
+    hook.x = Math.max(10, Math.min(390, hook.x));
+
+    // HOOK MOVEMENT
+    if (hook.state === "down") {
+        hook.y += hook.speed;
+        if (hook.y >= depthLimit) hook.state = "up";
+    }
+
+    if (hook.state === "up") {
+        hook.y -= hook.speed;
+        if (hook.y <= 0) {
+            hook.state = "idle";
+
+            // sell fish
+            hook.caught.forEach(f => money += f.value);
+            document.getElementById("money").innerText = money;
+
+            spawnFish();
+        }
+    }
+
+    // MOVE FISH
+    fish.forEach(f => {
+        if (!f.caught) {
+            f.x += f.dir * 1;
+            if (f.x < 10 || f.x > 390) f.dir *= -1;
+        }
+    });
+
+    // COLLISION
+    if (hook.state === "up") {
+        fish.forEach(f => {
+            if (
+                !f.caught &&
+                hook.caught.length < capacity &&
+                Math.abs(f.x - hook.x) < 15 &&
+                Math.abs(f.y - hook.y) < 15
+            ) {
+                f.caught = true;
+                hook.caught.push(f);
+            }
+        });
+    }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // CAMERA EFFECT
+    let offsetY = hook.y - 300;
+    if (offsetY < 0) offsetY = 0;
+
+    ctx.save();
+    ctx.translate(0, -offsetY);
+
+    // line
+    ctx.beginPath();
+    ctx.moveTo(hook.x, 0);
+    ctx.lineTo(hook.x, hook.y);
+    ctx.strokeStyle = "black";
+    ctx.stroke();
+
+    // hook
+    ctx.beginPath();
+    ctx.arc(hook.x, hook.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // fish
+    fish.forEach(f => {
+        if (!f.caught) {
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, f.size, 0, Math.PI * 2);
+            ctx.fillStyle = "orange";
+            ctx.fill();
+        }
+    });
+
+    // caught fish
+    hook.caught.forEach((f, i) => {
+        ctx.beginPath();
+        ctx.arc(hook.x, hook.y + i * 12, f.size, 0, Math.PI * 2);
+        ctx.fillStyle = "red";
+        ctx.fill();
+    });
+
+    ctx.restore();
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+
+// upgrades
+function upgradeDepth() {
+    if (money >= 100) {
+        money -= 100;
+        depthLimit += 300;
+        document.getElementById("money").innerText = money;
+        spawnFish();
+    }
+}
+
+function upgradeCapacity() {
+    if (money >= 100) {
+        money -= 100;
+        capacity += 1;
+        document.getElementById("money").innerText = money;
+    }
+}
+</script>
+
+</body>
+</html>
