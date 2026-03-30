@@ -2,191 +2,451 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Skate 3D - Hitboxes Added</title>
+  <title>Skate 3D</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #111; }
-    #info {
-      position: absolute; top: 10px; left: 10px;
-      background: rgba(0,0,0,0.5); padding: 10px;
-      color: white; font-family: sans-serif;
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #0d0d1a; font-family: system-ui, sans-serif; }
+    canvas { display: block; }
+
+    #hud {
+      position: absolute; top: 12px; left: 12px;
+      font-size: 13px; color: #fff; pointer-events: none;
+    }
+    #hud-inner {
+      background: rgba(0,0,0,0.6);
+      border-radius: 10px;
+      padding: 8px 14px;
+      line-height: 1.9;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    #hud-title { font-weight: 700; font-size: 15px; margin-bottom: 2px; }
+    .key { opacity: 0.5; }
+
+    #speedbar {
+      position: absolute; bottom: 16px; left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+    #speedbar-inner {
+      background: rgba(0,0,0,0.55);
+      border-radius: 20px;
+      padding: 5px 12px;
+      display: flex; align-items: center; gap: 8px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    #spd-label { font-size: 11px; color: rgba(255,255,255,0.45); letter-spacing: 0.06em; }
+    #sbar-track { width: 90px; height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; }
+    #sfill {
+      height: 100%; border-radius: 3px;
+      background: linear-gradient(90deg, #5fcfb0, #f7c557);
+      width: 0%; transition: width .08s;
+    }
+    #trick {
+      font-size: 13px; color: #f7c557;
+      min-width: 80px; text-align: center;
+      font-weight: 700; opacity: 0;
+      transition: opacity .25s;
     }
   </style>
 </head>
 <body>
-  <div id="info">
-    <strong>Skate 3D Prototype</strong><br>
-    W/S = Move • A/D = Turn • Space = Jump<br>
-    Obstacles now have hitboxes
+  <canvas id="c"></canvas>
+
+  <div id="hud">
+    <div id="hud-inner">
+      <div id="hud-title">Skate 3D</div>
+      <div><span class="key">W / S</span> &mdash; Push / brake</div>
+      <div><span class="key">A / D</span> &mdash; Turn</div>
+      <div><span class="key">Space</span> &mdash; Ollie</div>
+    </div>
+  </div>
+
+  <div id="speedbar">
+    <div id="speedbar-inner">
+      <span id="spd-label">SPD</span>
+      <div id="sbar-track"><div id="sfill"></div></div>
+      <div id="trick"></div>
+    </div>
   </div>
 
   <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-
   <script>
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x202020);
+  (function () {
 
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    // ── Renderer ─────────────────────────────────────────────────
+    var canvas = document.getElementById('c');
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+
+    // ── Scene ────────────────────────────────────────────────────
+    var scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0d0d1a);
+    scene.fog = new THREE.FogExp2(0x0d0d1a, 0.011);
+
+    var camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
     camera.position.set(0, 5, 10);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+    // ── Lights ───────────────────────────────────────────────────
+    scene.add(new THREE.AmbientLight(0x223355, 1.2));
+    scene.add(new THREE.HemisphereLight(0x334466, 0x111122, 0.8));
 
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(5, 10, 5);
-    scene.add(light);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+    var sun = new THREE.DirectionalLight(0xffeedd, 1.6);
+    sun.position.set(25, 50, 15);
+    sun.castShadow = true;
+    sun.shadow.mapSize.width  = 2048;
+    sun.shadow.mapSize.height = 2048;
+    sun.shadow.camera.near   = 1;
+    sun.shadow.camera.far    = 200;
+    sun.shadow.camera.left   = -60;
+    sun.shadow.camera.right  = 60;
+    sun.shadow.camera.top    = 60;
+    sun.shadow.camera.bottom = -60;
+    sun.shadow.bias = -0.001;
+    scene.add(sun);
 
-    // Ground
-    const ground = new THREE.Mesh(
+    var fillLight = new THREE.PointLight(0x5533ff, 0.5, 50);
+    fillLight.position.set(-20, 10, 0);
+    scene.add(fillLight);
+
+    // ── Stars ─────────────────────────────────────────────────────
+    var sv = [];
+    for (var i = 0; i < 700; i++) {
+      sv.push(
+        (Math.random() - 0.5) * 400,
+        Math.random() * 80 + 15,
+        (Math.random() - 0.5) * 400
+      );
+    }
+    var starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(sv, 3));
+    scene.add(new THREE.Points(
+      starGeo,
+      new THREE.PointsMaterial({ color: 0xffffff, size: 0.2, transparent: true, opacity: 0.75 })
+    ));
+
+    // ── Ground ────────────────────────────────────────────────────
+    var gc = document.createElement('canvas');
+    gc.width = gc.height = 128;
+    var gctx = gc.getContext('2d');
+    gctx.fillStyle = '#242428';
+    gctx.fillRect(0, 0, 128, 128);
+    gctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    gctx.lineWidth = 1;
+    for (var gi = 0; gi <= 128; gi += 32) {
+      gctx.beginPath(); gctx.moveTo(gi, 0); gctx.lineTo(gi, 128); gctx.stroke();
+      gctx.beginPath(); gctx.moveTo(0, gi); gctx.lineTo(128, gi); gctx.stroke();
+    }
+    var gridTex = new THREE.CanvasTexture(gc);
+    gridTex.wrapS = gridTex.wrapT = THREE.RepeatWrapping;
+    gridTex.repeat.set(30, 30);
+
+    var ground = new THREE.Mesh(
       new THREE.PlaneGeometry(300, 300),
-      new THREE.MeshStandardMaterial({ color: 0x333333 })
+      new THREE.MeshStandardMaterial({ map: gridTex, roughness: 0.95, metalness: 0.05, color: 0x252530 })
     );
     ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
     scene.add(ground);
 
-    // Skateboard
-    const boardGroup = new THREE.Group();
-    const deck = new THREE.Mesh(
-      new THREE.BoxGeometry(2.5, 0.1, 0.6),
-      new THREE.MeshStandardMaterial({ color: 0x2222ff })
-    );
-    boardGroup.add(deck);
+    // ── Skateboard ────────────────────────────────────────────────
+    var boardGroup = new THREE.Group();
+    boardGroup.position.set(0, 0.22, 0);
 
-    boardGroup.position.set(0, 0.2, 0);
+    // Grip tape canvas texture
+    var gtc = document.createElement('canvas');
+    gtc.width = 256; gtc.height = 64;
+    var gtx = gtc.getContext('2d');
+    gtx.fillStyle = '#0a22bb';
+    gtx.fillRect(0, 0, 256, 64);
+    gtx.fillStyle = 'rgba(255,255,255,0.07)';
+    for (var gi2 = 0; gi2 < 256; gi2 += 4) gtx.fillRect(gi2, 0, 2, 64);
+    gtx.fillStyle = 'rgba(255,255,255,0.2)';
+    gtx.fillRect(105, 22, 46, 18);
+    var gripTex = new THREE.CanvasTexture(gtc);
+
+    // Deck
+    var deck = new THREE.Mesh(
+      new THREE.BoxGeometry(2.5, 0.08, 0.65),
+      new THREE.MeshStandardMaterial({ map: gripTex, roughness: 0.5, metalness: 0.05 })
+    );
+    deck.castShadow = true;
+    boardGroup.add(deck); // child 0
+
+    // Wheels (children 1-4)
+    var wheelGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.12, 16);
+    var wheelMat = new THREE.MeshStandardMaterial({ color: 0xe0e0e0, roughness: 0.3, metalness: 0.3 });
+    var wPos = [[1.0, -0.1, 0.24], [1.0, -0.1, -0.24], [-1.0, -0.1, 0.24], [-1.0, -0.1, -0.24]];
+    wPos.forEach(function(p) {
+      var w = new THREE.Mesh(wheelGeo, wheelMat);
+      w.rotation.z = Math.PI / 2;
+      w.position.set(p[0], p[1], p[2]);
+      w.castShadow = true;
+      boardGroup.add(w);
+    });
+
+    // Trucks (children 5-6)
+    var truckMat = new THREE.MeshStandardMaterial({ color: 0xb0b0b0, roughness: 0.25, metalness: 0.85 });
+    [0.9, -0.9].forEach(function(x) {
+      var t = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.07, 0.72), truckMat);
+      t.position.set(x, -0.06, 0);
+      boardGroup.add(t);
+    });
+
     scene.add(boardGroup);
 
-    // Hitbox list
-    const hitboxes = [];
+    // Shadow blob
+    var shadowBlob = new THREE.Mesh(
+      new THREE.CircleGeometry(0.9, 20),
+      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3, depthWrite: false })
+    );
+    shadowBlob.rotation.x = -Math.PI / 2;
+    shadowBlob.position.y = 0.02;
+    scene.add(shadowBlob);
 
-    function addHitbox(mesh, w, h, d) {
-      hitboxes.push({
-        mesh,
-        box: new THREE.Box3().setFromCenterAndSize(mesh.position, new THREE.Vector3(w, h, d))
+    // ── Obstacle helpers ──────────────────────────────────────────
+    var hitboxes = [];
+
+    function mkMat(color, rough, metal) {
+      return new THREE.MeshStandardMaterial({
+        color: color,
+        roughness: rough !== undefined ? rough : 0.7,
+        metalness: metal !== undefined ? metal : 0.05
       });
     }
 
-    // Obstacles
     function addRamp(x, z) {
-      const geo = new THREE.BoxGeometry(6, 3, 6);
-      const mat = new THREE.MeshStandardMaterial({ color: 0x884400 });
-      const ramp = new THREE.Mesh(geo, mat);
-      ramp.position.set(x, 1.5, z);
-      ramp.rotation.x = -Math.PI / 6;
-      scene.add(ramp);
-
-      addHitbox(ramp, 6, 3, 6);
+      var body = new THREE.Mesh(new THREE.BoxGeometry(6, 2, 5), mkMat(0x7a5230, 0.85));
+      body.position.set(x, 1.0, z);
+      body.castShadow = true;
+      body.receiveShadow = true;
+      scene.add(body);
+      var lip = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.12, 0.2), mkMat(0x555555, 0.3, 0.6));
+      lip.position.set(x, 2.08, z - 2.4);
+      scene.add(lip);
+      [-2.8, 2.8].forEach(function(ox) {
+        var s = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2, 5), mkMat(0x5a3c1e, 0.9));
+        s.position.set(x + ox, 1.0, z);
+        s.castShadow = true;
+        scene.add(s);
+      });
+      hitboxes.push({ mesh: body, box: new THREE.Box3() });
     }
 
     function addFunbox(x, z) {
-      const geo = new THREE.BoxGeometry(4, 1.5, 4);
-      const mat = new THREE.MeshStandardMaterial({ color: 0x555555 });
-      const box = new THREE.Mesh(geo, mat);
-      box.position.set(x, 0.75, z);
-      scene.add(box);
-
-      addHitbox(box, 4, 1.5, 4);
+      var base = new THREE.Mesh(new THREE.BoxGeometry(4, 1.4, 4), mkMat(0x2e2e3a, 0.75));
+      base.position.set(x, 0.7, z);
+      base.castShadow = true;
+      base.receiveShadow = true;
+      scene.add(base);
+      var ledge = new THREE.Mesh(new THREE.BoxGeometry(4.1, 0.1, 4.1), mkMat(0x999999, 0.25, 0.65));
+      ledge.position.set(x, 1.45, z);
+      scene.add(ledge);
+      hitboxes.push({ mesh: base, box: new THREE.Box3() });
     }
 
     function addRail(x, z) {
-      const geo = new THREE.CylinderGeometry(0.1, 0.1, 8, 16);
-      const mat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-      const rail = new THREE.Mesh(geo, mat);
+      var rail = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.06, 0.06, 8, 14),
+        mkMat(0xcccccc, 0.15, 0.9)
+      );
       rail.rotation.x = Math.PI / 2;
-      rail.position.set(x, 0.5, z);
+      rail.position.set(x, 0.7, z);
+      rail.castShadow = true;
       scene.add(rail);
-
-      addHitbox(rail, 0.5, 0.5, 8);
+      [-3.6, 3.6].forEach(function(oz) {
+        var leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.7, 8), mkMat(0x888888, 0.4, 0.5));
+        leg.position.set(x, 0.35, z + oz);
+        scene.add(leg);
+      });
+      hitboxes.push({ mesh: rail, box: new THREE.Box3() });
     }
 
     function addBump(x, z) {
-      const geo = new THREE.SphereGeometry(2, 16, 16);
-      const mat = new THREE.MeshStandardMaterial({ color: 0x444444 });
-      const bump = new THREE.Mesh(geo, mat);
-      bump.position.set(x, 1, z);
+      var bump = new THREE.Mesh(new THREE.SphereGeometry(1.6, 24, 24), mkMat(0x333338, 0.9));
+      bump.scale.y = 0.55;
+      bump.position.set(x, 0.88, z);
+      bump.castShadow = true;
+      bump.receiveShadow = true;
       scene.add(bump);
-
-      addHitbox(bump, 4, 4, 4);
+      hitboxes.push({ mesh: bump, box: new THREE.Box3() });
     }
 
-    addRamp(10, -10);
-    addFunbox(-15, -5);
-    addRail(0, -20);
-    addBump(5, 15);
-    addBump(-10, 18);
+    function addLampPost(x, z) {
+      var post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.09, 5.5, 8), mkMat(0x444444, 0.6, 0.4));
+      post.position.set(x, 2.75, z);
+      post.castShadow = true;
+      scene.add(post);
+      var arm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 1.0), mkMat(0x444444, 0.6, 0.4));
+      arm.position.set(x, 5.5, z - 0.5);
+      scene.add(arm);
+      var globe = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 10, 10),
+        new THREE.MeshStandardMaterial({ color: 0xffffcc, emissive: 0xffffaa, emissiveIntensity: 3 })
+      );
+      globe.position.set(x, 5.5, z - 1.0);
+      scene.add(globe);
+      var pl = new THREE.PointLight(0xffffcc, 1.2, 22);
+      pl.position.set(x, 5.3, z - 1.0);
+      scene.add(pl);
+    }
 
-    // Movement
-    const keys = {};
-    let velocity = 0;
-    let turnSpeed = 0;
-    let verticalVelocity = 0;
-    const maxSpeed = 0.15;
-    const accel = 0.004;
-    const friction = 0.96;
-    const turnRate = 0.04;
-    const gravity = -0.01;
-    const jumpStrength = 0.22;
-    let isGrounded = true;
+    // Place obstacles
+    addRamp(10, -10);    addFunbox(-15, -5);   addRail(0, -20);
+    addBump(5, 15);      addBump(-10, 18);      addRamp(-20, -25);
+    addFunbox(18, 5);    addRail(-5, 25);       addBump(20, 20);
+    addLampPost(12, 8);  addLampPost(-12, -8);
+    addLampPost(0, 22);  addLampPost(22, -14);
 
-    window.addEventListener("keydown", e => keys[e.code] = true);
-    window.addEventListener("keyup", e => keys[e.code] = false);
+    // ── Input ─────────────────────────────────────────────────────
+    var keys = {};
+    window.addEventListener('keydown', function(e) {
+      keys[e.code] = true;
+      if (e.code === 'Space') e.preventDefault();
+    });
+    window.addEventListener('keyup', function(e) {
+      keys[e.code] = false;
+    });
+
+    // ── Physics state ─────────────────────────────────────────────
+    var speed      = 0;
+    var vertVel    = 0;
+    var isGrounded = true;
+    var boardLean  = 0;
+    var trickTimer = 0;
+    var airTime    = 0;
+
+    var MAX_SPEED = 0.18;
+    var ACCEL     = 0.005;
+    var FRICTION  = 0.965;
+    var TURN_RATE = 0.046;
+    var GRAVITY   = -0.013;
+    var JUMP_STR  = 0.25;
+    var GROUND_Y  = 0.22;
+
+    var tricks  = ['Ollie!', 'Kickflip!', 'Heelflip!', 'Pop Shove-it!', '180!', 'Varial!'];
+    var trickEl = document.getElementById('trick');
+    var sfill   = document.getElementById('sfill');
+    var trickTimeout = null;
+
+    function showTrick(name) {
+      trickEl.textContent = name;
+      trickEl.style.opacity = '1';
+      if (trickTimeout) clearTimeout(trickTimeout);
+      trickTimeout = setTimeout(function() { trickEl.style.opacity = '0'; }, 1300);
+    }
 
     function checkCollisions() {
-      const boardBox = new THREE.Box3().setFromObject(boardGroup);
-
-      for (const hb of hitboxes) {
-        hb.box.setFromObject(hb.mesh);
-
-        if (hb.box.intersectsBox(boardBox)) {
-          // Simple collision response: stop movement
-          velocity = 0;
-
-          // Lift board onto obstacle if landing on top
-          boardGroup.position.y = hb.box.max.y + 0.2;
-          isGrounded = true;
+      var bb = new THREE.Box3().setFromObject(boardGroup);
+      for (var hi = 0; hi < hitboxes.length; hi++) {
+        var h = hitboxes[hi];
+        h.box.setFromObject(h.mesh);
+        if (h.box.intersectsBox(bb)) {
+          var topY = h.box.max.y;
+          if (boardGroup.position.y > topY - 0.4) {
+            boardGroup.position.y = topY + 0.22;
+            vertVel    = 0;
+            isGrounded = true;
+            airTime    = 0;
+            boardGroup.rotation.x = 0;
+          } else {
+            speed = speed * -0.3;
+          }
         }
       }
     }
 
+    var clock = new THREE.Clock();
+    var t     = 0;
+
     function update() {
-      if (keys["KeyW"]) velocity += accel;
-      else if (keys["KeyS"]) velocity -= accel;
-      else velocity *= friction;
+      var dt = clock.getDelta();
+      if (dt > 0.05) dt = 0.05;
+      t += dt;
 
-      velocity = Math.max(Math.min(velocity, maxSpeed), -maxSpeed);
+      // Acceleration
+      if (keys['KeyW']) {
+        speed += ACCEL;
+      } else if (keys['KeyS']) {
+        speed -= ACCEL * 0.7;
+      } else {
+        speed *= FRICTION;
+      }
+      if (speed >  MAX_SPEED)       speed =  MAX_SPEED;
+      if (speed < -MAX_SPEED * 0.4) speed = -MAX_SPEED * 0.4;
 
-      if (keys["KeyA"]) turnSpeed = turnRate;
-      else if (keys["KeyD"]) turnSpeed = -turnRate;
-      else turnSpeed = 0;
+      // Turn
+      var turnInput = keys['KeyA'] ? 1 : keys['KeyD'] ? -1 : 0;
+      var turnMult  = Math.abs(speed) / MAX_SPEED;
+      boardGroup.rotation.y += turnInput * TURN_RATE * Math.max(turnMult, 0.15);
 
-      boardGroup.rotation.y += turnSpeed;
+      // Lean
+      var targetLean = turnInput * 0.2;
+      boardLean += (targetLean - boardLean) * 0.12;
+      var wobble = Math.sin(t * 14) * 0.01 * turnMult;
+      boardGroup.rotation.z = boardLean + wobble;
 
-      const forward = new THREE.Vector3(0, 0, -1);
-      forward.applyAxisAngle(new THREE.Vector3(0, 1, 0), boardGroup.rotation.y);
-      boardGroup.position.addScaledVector(forward, velocity);
+      // Move
+      var fwd = new THREE.Vector3(0, 0, -1);
+      fwd.applyAxisAngle(new THREE.Vector3(0, 1, 0), boardGroup.rotation.y);
+      boardGroup.position.addScaledVector(fwd, speed);
 
-      if (keys["Space"] && isGrounded) {
-        verticalVelocity = jumpStrength;
+      // Jump
+      if (keys['Space'] && isGrounded) {
+        vertVel    = JUMP_STR;
         isGrounded = false;
+        trickTimer = 0;
+        airTime    = 0;
+        showTrick(tricks[Math.floor(Math.random() * tricks.length)]);
       }
 
+      // Gravity
       if (!isGrounded) {
-        verticalVelocity += gravity;
-        boardGroup.position.y += verticalVelocity;
-
-        if (boardGroup.position.y <= 0.2) {
-          boardGroup.position.y = 0.2;
-          verticalVelocity = 0;
+        airTime += dt;
+        vertVel += GRAVITY;
+        boardGroup.position.y += vertVel;
+        boardGroup.rotation.x = Math.sin(trickTimer++ * 0.18) * 0.35 * Math.max(0, 1 - airTime * 1.2);
+        if (boardGroup.position.y <= GROUND_Y) {
+          boardGroup.position.y = GROUND_Y;
+          vertVel    = 0;
           isGrounded = true;
+          airTime    = 0;
+          boardGroup.rotation.x = 0;
         }
       }
 
       checkCollisions();
 
-      const camOffset = new THREE.Vector3(0, 3, 7);
-      camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), boardGroup.rotation.y);
-      camera.position.copy(boardGroup.position.clone().add(camOffset));
-      camera.lookAt(boardGroup.position.x, boardGroup.position.y + 0.5, boardGroup.position.z);
+      // Spin wheels
+      for (var wi = 1; wi <= 4; wi++) {
+        boardGroup.children[wi].rotation.y += speed * 9;
+      }
+
+      // Shadow blob
+      shadowBlob.position.x = boardGroup.position.x;
+      shadowBlob.position.z = boardGroup.position.z;
+      var heightAbove = boardGroup.position.y - GROUND_Y;
+      shadowBlob.material.opacity = Math.max(0, 0.32 - heightAbove * 0.1);
+      var sc = 1 + heightAbove * 0.15;
+      shadowBlob.scale.set(sc, 1, sc);
+
+      // Camera
+      var pullback = 7 + Math.abs(speed) / MAX_SPEED * 2.5;
+      var camTarget = new THREE.Vector3(0, 3.5, pullback);
+      camTarget.applyAxisAngle(new THREE.Vector3(0, 1, 0), boardGroup.rotation.y);
+      camTarget.add(boardGroup.position);
+      camera.position.lerp(camTarget, 0.08);
+      camera.lookAt(boardGroup.position.x, boardGroup.position.y + 0.6, boardGroup.position.z);
+
+      // Speed bar
+      sfill.style.width = (Math.abs(speed) / MAX_SPEED * 100).toFixed(1) + '%';
+
+      // Ambient fill follows player
+      fillLight.position.set(boardGroup.position.x - 15, 8, boardGroup.position.z);
     }
 
     function animate() {
@@ -194,8 +454,16 @@
       update();
       renderer.render(scene, camera);
     }
-
     animate();
+
+    // Resize
+    window.addEventListener('resize', function() {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    });
+
+  })();
   </script>
 </body>
 </html>
