@@ -1,0 +1,376 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Crimson+Pro:wght@300;400;600&display=swap');
+:root{--gold:#c9a84c;--gold-l:#e8c96a;--gold-d:#8a6f2e;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Crimson Pro',Georgia,serif;background:#0a0a0f;min-height:100vh;display:flex;align-items:center;justify-content:center;}
+#app{width:860px;background:#0a0a0f;border-radius:16px;overflow:hidden;}
+#top{display:flex;gap:20px;padding:16px 20px 10px;background:radial-gradient(ellipse 100% 150% at 50% 0%,#1a0f02,#0a0a0f);align-items:flex-start;}
+#wheel-wrap{position:relative;width:210px;height:210px;flex-shrink:0;}
+.wheel-pointer{position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:18px solid var(--gold-l);z-index:11;}
+#wcanvas{border-radius:50%;box-shadow:0 0 0 5px var(--gold-d),0 0 0 9px #2a1a00,0 0 28px rgba(0,0,0,0.8);}
+#bcanvas{position:absolute;top:0;left:0;pointer-events:none;}
+.wheel-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:32px;height:32px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#c9a84c,#5a3a00);border:3px solid #e8c96a;z-index:10;}
+#result-col{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:120px;}
+#rnum{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:28px;font-weight:900;background:#222;color:#fff;border:3px solid rgba(255,255,255,0.2);transition:all .5s;}
+#rnum.rr{background:radial-gradient(circle at 35% 35%,#e74c3c,#7f0000);}
+#rnum.rb{background:radial-gradient(circle at 35% 35%,#333,#000);}
+#rnum.rg{background:radial-gradient(circle at 35% 35%,#27ae60,#0a4a1a);}
+#rlbl{font-family:'Playfair Display',serif;font-size:11px;color:var(--gold-l);letter-spacing:2px;text-transform:uppercase;}
+#spinres{font-size:15px;font-weight:700;min-height:44px;text-align:center;line-height:1.5;}
+#spinres.win{color:#7fff7f;}#spinres.lose{color:#ff8888;}
+#player-col{display:flex;flex-direction:column;gap:8px;flex:1;}
+#balance-box{background:rgba(0,0,0,0.6);border:1px solid rgba(201,168,76,0.3);border-radius:10px;padding:6px 14px;text-align:center;}
+#bal-lbl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.6);}
+#bal-val{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--gold-l);}
+#chip-row{display:flex;gap:5px;flex-wrap:wrap;}
+.chip-btn{width:40px;height:40px;border-radius:50%;border:3px dashed rgba(255,255,255,0.4);cursor:pointer;font-size:9px;font-weight:700;color:#fff;font-family:'Crimson Pro',serif;transition:transform .15s,box-shadow .15s;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,0.5);}
+.chip-btn:hover{transform:translateY(-2px);}
+.chip-btn.sel{border-color:#fff;box-shadow:0 0 0 2px #fff,0 4px 10px rgba(0,0,0,0.5);}
+.c1{background:radial-gradient(circle at 35% 35%,#e74c3c,#7f0000);}
+.c5{background:radial-gradient(circle at 35% 35%,#2e86c1,#0a3a6a);}
+.c10{background:radial-gradient(circle at 35% 35%,#d4a017,#6a4a00);}
+.c25{background:radial-gradient(circle at 35% 35%,#27ae60,#0a4a1a);}
+.c100{background:radial-gradient(circle at 35% 35%,#8e44ad,#3a0060);}
+#cur-bet{font-size:11px;color:rgba(201,168,76,0.8);letter-spacing:1px;}
+
+/* Payout table */
+#pay-table{background:rgba(0,0,0,0.45);border:1px solid rgba(201,168,76,0.15);border-radius:8px;padding:6px 10px;font-size:10px;}
+#pay-table div{display:flex;justify-content:space-between;gap:10px;padding:1px 0;color:rgba(255,255,255,0.6);}
+#pay-table span.hi{color:var(--gold-l);font-weight:700;}
+
+#bots-panel{display:flex;flex-direction:column;gap:5px;min-width:190px;}
+#bots-title{font-family:'Playfair Display',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(201,168,76,0.35);margin-bottom:2px;}
+.bot-row{display:flex;align-items:center;gap:7px;background:rgba(0,0,0,0.45);border:1px solid rgba(201,168,76,0.1);border-radius:8px;padding:5px 10px;}
+.bot-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.bot-info{flex:1;}
+.bot-name{font-family:'Playfair Display',serif;font-size:11px;color:var(--gold-l);}
+.bot-chips{font-size:11px;color:#a8d8a8;}
+.bot-bet-tag{font-size:9px;color:rgba(255,255,200,0.7);font-style:italic;min-height:12px;}
+.bot-result{font-size:10px;font-weight:700;min-height:12px;}
+.bot-result.w{color:#7fff7f;}.bot-result.l{color:#ff8888;}
+#bottom{background:radial-gradient(ellipse 100% 100% at 50% 100%,#1a3a20,#0d2518 50%,#0a0a0f);padding:12px 18px 16px;border-top:2px solid rgba(201,168,76,0.12);}
+#tbl-title{font-family:'Playfair Display',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(201,168,76,0.3);text-align:center;margin-bottom:8px;}
+#num-grid{display:grid;grid-template-columns:auto repeat(12,1fr);grid-template-rows:repeat(3,34px);gap:3px;width:100%;margin-bottom:5px;}
+.nc{height:34px;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:'Playfair Display',serif;font-size:11px;font-weight:700;border:1px solid rgba(255,255,255,0.1);transition:transform .1s,box-shadow .15s;position:relative;user-select:none;}
+.nc:hover{transform:scale(1.08);box-shadow:0 0 8px rgba(201,168,76,0.5);z-index:2;}
+.nr{background:linear-gradient(135deg,#c0392b,#7f0000);}
+.nb{background:linear-gradient(135deg,#2c2c2c,#111);}
+.ng{background:linear-gradient(135deg,#27ae60,#0a4a1a);grid-row:1/4;}
+.nc.hb::after{content:attr(data-bet);position:absolute;top:-5px;right:-5px;background:var(--gold);color:#1a0f00;border-radius:50%;width:16px;height:16px;font-size:7px;font-weight:900;display:flex;align-items:center;justify-content:center;border:1px solid #fff;font-family:'Crimson Pro',serif;}
+.nc .bot-dots{position:absolute;bottom:2px;left:0;right:0;display:flex;justify-content:center;gap:2px;pointer-events:none;}
+.bdot{width:5px;height:5px;border-radius:50%;border:1px solid rgba(255,255,255,0.4);}
+#out-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;width:100%;margin-bottom:8px;}
+.oc{height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:'Playfair Display',serif;font-size:10px;font-weight:700;color:#e8dcc8;border:1px solid rgba(201,168,76,0.18);background:rgba(255,255,255,0.05);transition:transform .1s,box-shadow .15s;letter-spacing:.4px;position:relative;user-select:none;flex-direction:column;gap:1px;}
+.oc:hover{background:rgba(201,168,76,0.15);box-shadow:0 0 8px rgba(201,168,76,0.3);transform:scale(1.03);}
+.oc.hb::after{content:attr(data-bet);position:absolute;top:-5px;right:-5px;background:var(--gold);color:#1a0f00;border-radius:50%;width:16px;height:16px;font-size:7px;font-weight:900;display:flex;align-items:center;justify-content:center;border:1px solid #fff;font-family:'Crimson Pro',serif;}
+.or{background:linear-gradient(135deg,rgba(192,57,43,0.35),rgba(127,0,0,0.35))!important;}
+.obk{background:linear-gradient(135deg,rgba(44,44,44,0.5),rgba(17,17,17,0.5))!important;}
+.oc .bot-dots{position:absolute;bottom:2px;left:0;right:0;display:flex;justify-content:center;gap:2px;pointer-events:none;}
+.pay-lbl{font-size:7px;opacity:.55;letter-spacing:.8px;}
+#btn-row{display:flex;gap:8px;justify-content:center;}
+.abtn{padding:8px 20px;border-radius:8px;border:none;cursor:pointer;font-family:'Playfair Display',serif;font-size:13px;font-weight:700;letter-spacing:.5px;transition:transform .1s,opacity .15s;}
+.abtn:active:not(:disabled){transform:scale(0.95) translateY(1px);}
+.abtn:disabled{opacity:.3;cursor:default;}
+.bspin{background:linear-gradient(135deg,var(--gold-d),var(--gold),var(--gold-l));color:#1a0f00;box-shadow:0 4px 0 var(--gold-d);padding:9px 32px;}
+.bclear{background:linear-gradient(135deg,#7f1d1d,#c0392b);color:#ffe4e4;box-shadow:0 3px 0 #6b0000;}
+.brpt{background:linear-gradient(135deg,#1e3a5f,#2980b9);color:#e4f0ff;box-shadow:0 3px 0 #0d2040;}
+</style>
+
+<div id="app">
+  <div id="top">
+    <div id="wheel-wrap">
+      <div class="wheel-pointer"></div>
+      <canvas id="wcanvas" width="210" height="210"></canvas>
+      <canvas id="bcanvas" width="210" height="210"></canvas>
+      <div class="wheel-center"></div>
+    </div>
+    <div id="result-col">
+      <div id="rnum">—</div>
+      <div id="rlbl">Last Spin</div>
+      <div id="spinres"></div>
+    </div>
+    <div id="player-col">
+      <div id="balance-box">
+        <div id="bal-lbl">Your Balance</div>
+        <div id="bal-val">1,500</div>
+      </div>
+      <div id="chip-row"></div>
+      <div id="cur-bet">Bet: 0</div>
+      <div id="pay-table">
+        <div><span>Single number</span><span class="hi">× 72</span></div>
+        <div><span>Red / Black / Even / Odd</span><span class="hi">× 4</span></div>
+        <div><span>Dozens / Columns</span><span class="hi">× 6</span></div>
+      </div>
+    </div>
+    <div id="bots-panel">
+      <div id="bots-title">Other Players</div>
+      <div id="bots-list"></div>
+    </div>
+  </div>
+  <div id="bottom">
+    <div id="tbl-title">Place Your Bets</div>
+    <div id="num-grid"></div>
+    <div id="out-grid"></div>
+    <div id="btn-row">
+      <button class="abtn bclear" onclick="clearBets()">Clear</button>
+      <button class="abtn bspin" id="spinbtn" onclick="doSpin()">Spin Wheel</button>
+      <button class="abtn brpt" id="rptbtn" onclick="repeatBets()" disabled>Repeat</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const WHEEL=[0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
+const REDS=new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+const BOT_COLORS=['#e74c3c','#3498db','#e67e22','#9b59b6'];
+const BOT_AVATARS=['🎩','🕶️','🌹','🎭'];
+const BOT_NAMES=['Viktor','Celeste','Rocco','Miriam'];
+const OUTSIDE=[
+  {key:'1-18',label:'1–18',pay:'2:1'},{key:'even',label:'Even',pay:'2:1'},
+  {key:'red',label:'Red',pay:'2:1',cls:'or'},{key:'black',label:'Black',pay:'2:1',cls:'obk'},
+  {key:'odd',label:'Odd',pay:'2:1'},{key:'19-36',label:'19–36',pay:'2:1'},
+  {key:'1st12',label:'1st 12',pay:'4:1'},{key:'2nd12',label:'2nd 12',pay:'4:1'},{key:'3rd12',label:'3rd 12',pay:'4:1'},
+  {key:'col1',label:'Col 1',pay:'4:1'},{key:'col2',label:'Col 2',pay:'4:1'},{key:'col3',label:'Col 3',pay:'4:1'},
+];
+
+function ncolor(n){return n===0?'g':REDS.has(n)?'r':'b';}
+
+let balance=1500,selChip=10,bets={},lastBets={},spinning=false,wAngle=0;
+const bots=BOT_NAMES.map((name,i)=>({name,chips:1200+Math.floor(Math.random()*600),color:BOT_COLORS[i],avatar:BOT_AVATARS[i],bets:{}}));
+
+function drawWheel(rot){
+  const c=document.getElementById('wcanvas'),ctx=c.getContext('2d'),cx=105,cy=105,R=103;
+  ctx.clearRect(0,0,210,210);
+  const n=WHEEL.length,sl=(Math.PI*2)/n;
+  WHEEL.forEach((num,i)=>{
+    const s=rot+i*sl-sl/2,e=s+sl;
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,R,s,e);ctx.closePath();
+    ctx.fillStyle=ncolor(num)==='r'?'#8B0000':ncolor(num)==='b'?'#111':'#0a4a1a';
+    ctx.fill();ctx.strokeStyle='rgba(201,168,76,0.3)';ctx.lineWidth=1;ctx.stroke();
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(rot+i*sl);ctx.translate(R*.72,0);ctx.rotate(Math.PI/2);
+    ctx.fillStyle='#fff';ctx.font=`bold ${num>=10?8:9}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(num,0,0);ctx.restore();
+  });
+  ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.strokeStyle='rgba(201,168,76,0.5)';ctx.lineWidth=2;ctx.stroke();
+  ctx.beginPath();ctx.arc(cx,cy,R*.54,0,Math.PI*2);ctx.strokeStyle='rgba(201,168,76,0.25)';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.beginPath();ctx.arc(cx,cy,16,0,Math.PI*2);ctx.fillStyle='#1a0f02';ctx.fill();
+}
+function drawBall(angle,radius){
+  const c=document.getElementById('bcanvas'),ctx=c.getContext('2d'),cx=105,cy=105;
+  ctx.clearRect(0,0,210,210);
+  if(radius<=0)return;
+  const bx=cx+Math.cos(angle)*radius,by=cy+Math.sin(angle)*radius;
+  ctx.beginPath();ctx.arc(bx+2,by+2,5,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,0.35)';ctx.fill();
+  const g=ctx.createRadialGradient(bx-1,by-1,1,bx,by,5);
+  g.addColorStop(0,'#fff');g.addColorStop(.4,'#ddd');g.addColorStop(1,'#aaa');
+  ctx.beginPath();ctx.arc(bx,by,5,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
+}
+
+function buildChips(){
+  document.getElementById('chip-row').innerHTML=[1,5,10,25,100].map(v=>
+    `<div class="chip-btn c${v} ${v===selChip?'sel':''}" onclick="selC(${v})">${v}</div>`).join('');
+}
+function selC(v){selChip=v;buildChips();}
+
+function buildGrid(){
+  const g=document.getElementById('num-grid');
+  g.innerHTML=`<div class="nc ng" style="font-size:13px;font-weight:900;" onclick="placeBet('0')" id="cell-0">0</div>`;
+  for(let col=1;col<=12;col++){
+    [col*3,col*3-1,col*3-2].forEach(n=>{
+      g.innerHTML+=`<div class="nc ${ncolor(n)==='r'?'nr':'nb'}" onclick="placeBet('${n}')" id="cell-${n}">${n}</div>`;
+    });
+  }
+}
+
+function buildOutside(){
+  document.getElementById('out-grid').innerHTML=OUTSIDE.map(b=>
+    `<div class="oc ${b.cls||''}" onclick="placeBet('${b.key}')" id="cell-${b.key}">
+      <span>${b.label}</span><span class="pay-lbl">${b.pay}</span>
+    </div>`).join('');
+}
+
+function buildBots(){
+  document.getElementById('bots-list').innerHTML=bots.map((b,i)=>`
+    <div class="bot-row" id="bot-${i}">
+      <div class="bot-avatar" style="background:${b.color}22;border:2px solid ${b.color}55;">${b.avatar}</div>
+      <div class="bot-info">
+        <div class="bot-name">${b.name}</div>
+        <div class="bot-chips" id="bchips-${i}">${b.chips.toLocaleString()} chips</div>
+        <div class="bot-bet-tag" id="bbt-${i}"></div>
+        <div class="bot-result" id="bres-${i}"></div>
+      </div>
+    </div>`).join('');
+}
+
+function placeBet(key){
+  if(spinning)return;
+  if(balance<selChip)return;
+  bets[key]=(bets[key]||0)+selChip;
+  balance-=selChip;
+  updateUI();
+}
+function clearBets(){
+  if(spinning)return;
+  Object.values(bets).forEach(v=>balance+=v);
+  bets={};updateUI();
+}
+function repeatBets(){
+  if(spinning)return;
+  const total=Object.values(lastBets).reduce((a,b)=>a+b,0);
+  if(total>balance)return;
+  bets={...lastBets};balance-=total;updateUI();
+}
+function totalBet(){return Object.values(bets).reduce((a,b)=>a+b,0);}
+
+// ── DOUBLED PAYOUTS ──
+// Standard roulette multipliers are doubled, then stake returned on top:
+//   Even money bets (Red/Black etc): normally 1:1 → now 2:1 profit → return stake × 4  (bet 10, win 40, profit 30)
+//   Dozen/Column bets: normally 2:1 → now 4:1 profit → return stake × 6  (bet 10, win 60, profit 50)  
+//   Straight up number: normally 35:1 → now 70:1 profit → return stake × 72 (bet 10, win 720, profit 710)
+function calcPayout(num, betMap){
+  const col=num===0?0:(num%3===0?3:num%3);
+  const dozen=num===0?0:(num<=12?1:num<=24?2:3);
+  const isRed=REDS.has(num);
+  let totalReturn=0;
+
+  Object.entries(betMap).forEach(([key,stake])=>{
+    const n=parseInt(key);
+    let mult=0;
+    if(!isNaN(n)){
+      if(n===num) mult=72; // 70:1 profit doubled from 35:1, +stake = ×72
+    } else if(key==='red'   && isRed)                 mult=4;  // 2:1 doubled, +stake
+    else if(key==='black'   && !isRed && num!==0)     mult=4;
+    else if(key==='even'    && num!==0 && num%2===0)  mult=4;
+    else if(key==='odd'     && num%2===1)             mult=4;
+    else if(key==='1-18'    && num>=1  && num<=18)    mult=4;
+    else if(key==='19-36'   && num>=19 && num<=36)    mult=4;
+    else if(key==='1st12'   && dozen===1)             mult=6;  // 4:1 doubled, +stake
+    else if(key==='2nd12'   && dozen===2)             mult=6;
+    else if(key==='3rd12'   && dozen===3)             mult=6;
+    else if(key==='col1'    && col===1)               mult=6;
+    else if(key==='col2'    && col===2)               mult=6;
+    else if(key==='col3'    && col===3)               mult=6;
+
+    totalReturn += stake * mult;
+  });
+  return totalReturn;
+}
+
+function updateUI(){
+  document.getElementById('bal-val').textContent=balance.toLocaleString();
+  document.getElementById('cur-bet').textContent='Bet: '+totalBet().toLocaleString();
+  document.querySelectorAll('[id^="cell-"]').forEach(el=>{
+    const key=el.id.replace('cell-','');
+    const amt=bets[key]||0;
+    if(amt>0){el.classList.add('hb');el.dataset.bet=amt;}
+    else{el.classList.remove('hb');delete el.dataset.bet;}
+    el.querySelectorAll('.bot-dots').forEach(d=>d.remove());
+  });
+  bots.forEach((bot,bi)=>{
+    Object.keys(bot.bets).forEach(key=>{
+      const el=document.getElementById('cell-'+key);
+      if(!el)return;
+      let dots=el.querySelector('.bot-dots');
+      if(!dots){dots=document.createElement('div');dots.className='bot-dots';el.appendChild(dots);}
+      const dot=document.createElement('div');dot.className='bdot';dot.style.background=bot.color;
+      dots.appendChild(dot);
+    });
+  });
+  document.getElementById('spinbtn').disabled=spinning||totalBet()===0;
+  document.getElementById('rptbtn').disabled=spinning||Object.keys(lastBets).length===0;
+}
+
+function botPlaceBets(){
+  const outKeys=OUTSIDE.map(o=>o.key);
+  bots.forEach((bot,i)=>{
+    bot.bets={};
+    if(bot.chips<=0){bot.chips=500;}
+    const numBets=1+Math.floor(Math.random()*3);
+    for(let j=0;j<numBets;j++){
+      const r=Math.random();
+      let key,amt;
+      if(r<0.4){key=outKeys[Math.floor(Math.random()*outKeys.length)];amt=[10,25,50][Math.floor(Math.random()*3)];}
+      else{key=String(Math.floor(Math.random()*37));amt=[5,10,25][Math.floor(Math.random()*3)];}
+      amt=Math.min(amt,bot.chips);
+      if(amt<=0)continue;
+      bot.bets[key]=(bot.bets[key]||0)+amt;
+      bot.chips-=amt;
+    }
+    const summary=Object.entries(bot.bets).map(([k,v])=>`${k}(${v})`).slice(0,2).join(', ');
+    const el=document.getElementById(`bbt-${i}`);
+    if(el)el.textContent=summary?`Bet: ${summary}`:'';
+  });
+}
+
+function doSpin(){
+  if(spinning||totalBet()===0)return;
+  spinning=true;
+  lastBets={...bets};
+  document.getElementById('spinres').textContent='Spinning…';
+  document.getElementById('spinres').className='';
+  bots.forEach((_,i)=>{document.getElementById(`bres-${i}`).textContent='';});
+  botPlaceBets();
+  updateUI();
+
+  const result=WHEEL[Math.floor(Math.random()*WHEEL.length)];
+  const ridx=WHEEL.indexOf(result);
+  const sl=(Math.PI*2)/WHEEL.length;
+  const dur=4800,t0=performance.now();
+  const startAngle=wAngle,totalSpins=5+Math.random()*3;
+  const endAngle=startAngle+(Math.PI*2*totalSpins);
+  const ballStart=Math.random()*Math.PI*2,ballSpins=totalSpins*1.7;
+
+  function ease(t){return 1-Math.pow(1-t,4);}
+  function animate(now){
+    const t=Math.min((now-t0)/dur,1),e=ease(t);
+    wAngle=startAngle+(endAngle-startAngle)*e;
+    drawWheel(wAngle);
+    drawBall(ballStart-(Math.PI*2*ballSpins*e),98+(80-98)*e);
+    if(t<1){requestAnimationFrame(animate);}
+    else{
+      wAngle=-(ridx*sl)-Math.PI/2;
+      drawWheel(wAngle);drawBall(0,0);
+      showResult(result);
+    }
+  }
+  requestAnimationFrame(animate);
+}
+
+function showResult(num){
+  const col=ncolor(num);
+  const rn=document.getElementById('rnum');
+  rn.textContent=num;rn.className=col==='r'?'rr':col==='b'?'rb':'rg';
+
+  const staked=Object.values(bets).reduce((a,b)=>a+b,0);
+  const returned=calcPayout(num,bets);
+  const profit=returned-staked;
+  balance+=returned;
+
+  const sr=document.getElementById('spinres');
+  if(returned>0){
+    sr.innerHTML=`<span style="color:#7fff7f;font-size:17px;">+${profit} profit!</span><br><span style="font-size:10px;color:rgba(255,255,255,0.4)">${returned} returned on ${staked} staked</span>`;
+    sr.className='win';
+  } else {
+    sr.innerHTML=`<span style="color:#ff8888">Lost ${staked} chips</span>`;
+    sr.className='lose';
+  }
+
+  // Bots
+  bots.forEach((bot,i)=>{
+    const botStaked=Object.values(bot.bets).reduce((a,b)=>a+b,0);
+    const botReturned=calcPayout(num,bot.bets);
+    bot.chips+=botReturned;
+    const res=document.getElementById(`bres-${i}`);
+    const bc=document.getElementById(`bchips-${i}`);
+    if(botReturned>0){const p=botReturned-botStaked;if(res){res.textContent=`+${p} ✓`;res.className='bot-result w';}}
+    else{if(res){res.textContent=`-${botStaked} ✗`;res.className='bot-result l';}}
+    if(bc)bc.textContent=bot.chips.toLocaleString()+' chips';
+    const bbt=document.getElementById(`bbt-${i}`);if(bbt)bbt.textContent='';
+  });
+
+  bets={};spinning=false;updateUI();
+}
+
+buildChips();buildGrid();buildOutside();buildBots();drawWheel(0);drawBall(0,0);updateUI();
+</script>
