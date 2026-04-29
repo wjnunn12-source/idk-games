@@ -1,8 +1,8 @@
 
 
 
-const gameDirectories = ["games/geometry-dash", "games/minecraft","games/poker","games/rolet"];
-const gameNames = ["Gemometry Dash", "Minecraft","poker","rolet"];
+const gameDirectories = ["games/geometry-dash", "games/black jack","games/poker","games/rolet"];
+const gameNames = ["Gemometry Dash", "black jack","poker","rolet"];
 const  _gameTemplate = document.querySelector("#gameTemplate");
 
 let newGame
