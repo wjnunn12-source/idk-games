@@ -66,9 +66,12 @@
                 <p>Wrong password.</p>
             </div>
         `;
-        window.close();
         
+        const entered = prompt("Enter Password:");
     }
+if (entered !== PASSWORD) {
+    window.location.href = "https://www.google.com";
+}
 </script>
 
 <div class="content">
