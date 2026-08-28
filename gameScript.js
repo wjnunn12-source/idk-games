@@ -1,8 +1,8 @@
 
 
 
-const gameDirectories = ["games/retro-bowl","games/block-blast", "games/black jack","games/poker","games/rolet","games/drivemad","games/bitplanes",];
-const gameNames = ["retro bowl","block blast", "black jack","poker","rolet","drive mad","bit plains"];
+const gameDirectories = ["games/retro-bowl","games/block-blast", "games/black jack","games/poker","games/rolet","games/drivemad","games/bitplanes","games/subwaysurfer"];
+const gameNames = ["retro bowl","block blast", "black jack","poker","rolet","drive mad","bit plains","sumwaysurfers"];
 const  _gameTemplate = document.querySelector("#gameTemplate");
 
 let newGame
